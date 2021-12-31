@@ -18,6 +18,19 @@ public final class ArgChecker {
     }
 
     /**
+     * Throws {@link IllegalArgumentException} if {@code value} is equal to {@code target}.
+     *
+     * @param value The value to test.
+     * @param target The target value, which value must not be equal to.
+     * @throws IllegalArgumentException if value is equal to target.
+     */
+    public static void assertNotEquals(Object value, Object target) {
+        if (value.equals(target)) {
+            throw new IllegalArgumentException("value " + value + " must not equal " + target);
+        }
+    }
+
+    /**
      * Throws {@link IllegalArgumentException} if {@code value} is not equal to {@code target}.
      *
      * @param value The value to test.

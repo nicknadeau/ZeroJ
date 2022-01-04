@@ -37,7 +37,14 @@ public enum ReceiptCode {
     , LAYER_ONE_FAILURE
 
     /*
+     * The action could not be performed because some crucial step failed.
+     * Note this differs from UNEXPECTED because UNEXPECTED is used to signal an unexpected exception encountered.
+     */
+    , FAILED
+
+    /*
      * The action could not be performed because an unexpected error occurred.
+     * Note this differs from FAILED because FAILED is used to signal a regular failure as opposed to an exception.
      */
     , UNEXPECTED
 }

@@ -39,4 +39,14 @@ public interface ZeroDatabase {
      * @return the block or null if not found.
      */
     public Block findBlockByHash(byte[] blockHash);
+
+    /**
+     * Saves the specified block in the database and returns {@code true} to indicate that the block was successfully
+     * saved and {@code false} to indicate an error occurred and the block could not be saved.
+     *
+     * @param block The block to save.
+     * @return whether or not the block was saved.
+     * @throws NullPointerException if block is null.
+     */
+    public boolean saveBlock(Block block);
 }

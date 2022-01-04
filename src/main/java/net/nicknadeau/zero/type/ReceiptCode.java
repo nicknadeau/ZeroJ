@@ -32,6 +32,11 @@ public enum ReceiptCode {
     , VERSION_MISMATCH
 
     /*
+     * The action was performed by layer one, not layer zero, and it failed.
+     */
+    , LAYER_ONE_FAILURE
+
+    /*
      * The action could not be performed because an unexpected error occurred.
      */
     , UNEXPECTED

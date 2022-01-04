@@ -6,12 +6,18 @@ import net.nicknadeau.zero.util.internal.ArgChecker;
  * A receipt that is used to describe the result of performing some action.
  *
  * A successful receipt will have its {@link Receipt#getCode()} value equal to {@link ReceiptCode#SUCCESS}. In this
- * case, {@link Receipt#getErrorMessage()} will be invalid and {@link Receipt#getUnexpectedErrorCause()} will return a
- * null cause.
+ * case, {@link Receipt#getErrorMessage()} will be invalid, {@link Receipt#getUnexpectedErrorCause()} will return a
+ * null cause, and {@link Receipt#getLayerOneErrorCode()} will be nonsense.
  *
  * An unexpected error receipt will have its {@link Receipt#getCode()} value equal to {@link ReceiptCode#UNEXPECTED}.
- * In this case, {@link Receipt#getErrorMessage()} will be invalid but {@link Receipt#getUnexpectedErrorCause()} will
- * return a non-null exception, which was the cause of the error.
+ * In this case, {@link Receipt#getErrorMessage()} will be invalid, {@link Receipt#getLayerOneErrorCode()} will be
+ * nonsense, but {@link Receipt#getUnexpectedErrorCause()} will return a non-null exception, which was the cause of the
+ * error.
+ *
+ * A layer one failure receipt will have its {@link Receipt#getLayerOneErrorCode()} value equal to some error code
+ * defined by the layer one protocol, and which is opaque to us. In this case, something went wrong in layer one and
+ * we have no visibility into it. The value returned by {@link Receipt#getErrorMessage()} will be null and the value
+ * returned by {@link Receipt#getUnexpectedErrorCause()} will also be null.
  *
  * Otherwise, the receipt is simply a failed receipt and {@link Receipt#getErrorMessage()} will be set to a valid
  * message but {@link Receipt#getUnexpectedErrorCause()} will return a null cause.
@@ -22,11 +28,13 @@ public final class Receipt {
     private final ReceiptCode code;
     private final String errorMessage;
     private final Exception unexpectedErrorCause;
+    private final int layerOneErrorCode;
 
-    private Receipt(ReceiptCode code, String errorMessage, Exception unexpectedErrorCause) {
+    private Receipt(ReceiptCode code, String errorMessage, Exception unexpectedErrorCause, int layerOneErrorCode) {
         this.code = code;
         this.errorMessage = errorMessage;
         this.unexpectedErrorCause = unexpectedErrorCause;
+        this.layerOneErrorCode = layerOneErrorCode;
     }
 
     /**
@@ -36,7 +44,7 @@ public final class Receipt {
      * @return the new receipt.
      */
     public static Receipt successfulReceipt() {
-        return new Receipt(ReceiptCode.SUCCESS, null, null);
+        return new Receipt(ReceiptCode.SUCCESS, null, null, -1);
     }
 
     /**
@@ -49,7 +57,7 @@ public final class Receipt {
      */
     public static Receipt unexpectedErrorReceipt(Exception cause) {
         ArgChecker.assertNonNull(cause);
-        return new Receipt(ReceiptCode.UNEXPECTED, null, cause);
+        return new Receipt(ReceiptCode.UNEXPECTED, null, cause, -1);
     }
 
     /**
@@ -67,7 +75,18 @@ public final class Receipt {
         ArgChecker.assertNotEquals(code, ReceiptCode.SUCCESS);
         ArgChecker.assertNotEquals(code, ReceiptCode.UNEXPECTED);
         ArgChecker.assertNonNull(errorMessage);
-        return new Receipt(code, errorMessage, null);
+        return new Receipt(code, errorMessage, null, -1);
+    }
+
+    /**
+     * Returns a new receipt whose code is {@link ReceiptCode#LAYER_ONE_FAILURE} and which has its layer one error code
+     * set to the specified code.
+     *
+     * @param layerOneErrorCode The error code that is defined by layer one and which encapsulates the failure reason.
+     * @return the the receipt.
+     */
+    public static Receipt layerOneFailedReceipt(int layerOneErrorCode) {
+        return new Receipt(ReceiptCode.LAYER_ONE_FAILURE, null, null, layerOneErrorCode);
     }
 
     /**
@@ -99,12 +118,24 @@ public final class Receipt {
         return this.unexpectedErrorCause;
     }
 
+    /**
+     * Returns the opaque layer one error code, which is only valid if the receipt code is
+     * {@link ReceiptCode#LAYER_ONE_FAILURE}, otherwise the returned value is nonsense.
+     *
+     * @return the layer one error code.
+     */
+    public int getLayerOneErrorCode() {
+        return this.layerOneErrorCode;
+    }
+
     @Override
     public String toString() {
         if (this.code == ReceiptCode.SUCCESS) {
             return Receipt.class.getSimpleName() + "{ success }";
         } else if (this.code == ReceiptCode.UNEXPECTED) {
             return Receipt.class.getSimpleName() + "{ unexpected error }";
+        } else if (this.code == ReceiptCode.LAYER_ONE_FAILURE) {
+            return Receipt.class.getSimpleName() + "{ layer one failure }";
         } else {
             return Receipt.class.getSimpleName() + "{ failed | code=" + this.code + " }";
         }

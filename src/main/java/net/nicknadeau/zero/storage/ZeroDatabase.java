@@ -1,6 +1,7 @@
 package net.nicknadeau.zero.storage;
 
 import net.nicknadeau.zero.block.Block;
+import net.nicknadeau.zero.block.BlockStatus;
 
 /**
  * A database that layer zero calls into to determine its state.
@@ -45,8 +46,9 @@ public interface ZeroDatabase {
      * saved and {@code false} to indicate an error occurred and the block could not be saved.
      *
      * @param block The block to save.
-     * @return whether or not the block was saved.
-     * @throws NullPointerException if block is null.
+     * @param status The block status to save.
+     * @return whether or not the block and its status were saved.
+     * @throws NullPointerException if block or status are null.
      */
-    public boolean saveBlock(Block block);
+    public boolean saveBlockAndStatus(Block block, BlockStatus status);
 }

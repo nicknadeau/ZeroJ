@@ -1,6 +1,7 @@
 package net.nicknadeau.zero.blockchain;
 
 import net.nicknadeau.zero.block.Block;
+import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
 import net.nicknadeau.zero.storage.ZeroDatabase;
 import net.nicknadeau.zero.type.Receipt;
@@ -67,7 +68,7 @@ public final class ZeroBlockchain {
                 //TODO: Handle layer state mismatch recovery.
 
                 // Add the block to layer zero.
-                if (!this.database.saveBlock(block)) {
+                if (!this.database.saveBlockAndStatus(block, BlockStatus.ADDED)) {
                     return Receipt.failedReceipt(ReceiptCode.FAILED, "failed to save block to database");
                 }
 

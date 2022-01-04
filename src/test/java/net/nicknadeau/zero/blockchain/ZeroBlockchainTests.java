@@ -1,5 +1,6 @@
 package net.nicknadeau.zero.blockchain;
 
+import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.LayerOneAddBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.LayerOneValidateBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
@@ -71,7 +72,7 @@ public class ZeroBlockchainTests {
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
         // Override the database to fail when we first try to save the block.
-        Mockito.when(database.saveBlock(genesisBlock)).thenReturn(false);
+        Mockito.when(database.saveBlockAndStatus(genesisBlock, BlockStatus.ADDED)).thenReturn(false);
 
         ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
         ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()

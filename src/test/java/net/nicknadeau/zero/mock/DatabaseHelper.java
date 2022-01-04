@@ -1,6 +1,7 @@
 package net.nicknadeau.zero.mock;
 
 import net.nicknadeau.zero.block.Block;
+import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.storage.ZeroDatabase;
 import org.mockito.Mockito;
 
@@ -24,7 +25,7 @@ public final class DatabaseHelper {
         for (Block block : blocksInDb) {
             Mockito.when(database.findBlockByHash(block.getBlockHash())).thenReturn(block);
             Mockito.when(database.blockExists(block.getBlockHash())).thenReturn(true);
-            Mockito.when(database.saveBlock(block)).thenReturn(false);
+            Mockito.when(database.saveBlockAndStatus(block, BlockStatus.ADDED)).thenReturn(false);
 
             if (block.getBlockNumber().equals(BigInteger.ZERO)) {
                 containsGenesis = true;
@@ -36,7 +37,7 @@ public final class DatabaseHelper {
         for (Block block : blocksToAdd) {
             Mockito.when(database.findBlockByHash(block.getBlockHash())).thenReturn(null);
             Mockito.when(database.blockExists(block.getBlockHash())).thenReturn(false);
-            Mockito.when(database.saveBlock(block)).thenReturn(true);
+            Mockito.when(database.saveBlockAndStatus(block, BlockStatus.ADDED)).thenReturn(true);
         }
 
         return database;

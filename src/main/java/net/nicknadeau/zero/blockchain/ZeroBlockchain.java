@@ -53,32 +53,53 @@ public final class ZeroBlockchain {
     public Receipt addBlock(Block block) {
         synchronized (this.lock) {
             try {
-                // Perform the layer zero block verifications.
-                Receipt receipt = BlockValidator.runLayerZeroValidation(block, this.database, this.hashFunction, this.signatureVerifier);
+                // Perform the block verifications.
+                Receipt receipt = validateBlock(block);
                 if (receipt.getCode() != ReceiptCode.SUCCESS) {
                     return receipt;
                 }
 
-                // Perform the layer one block verifications.
-                int layerOneCode = this.callbacks.getLayerOneValidateBlockCallback().validate(block);
-                if (layerOneCode != 0) {
-                    return Receipt.layerOneFailedReceipt(layerOneCode);
-                }
-
                 //TODO: Handle layer state mismatch recovery.
 
-                // Add the block to layer zero.
-                if (!this.database.saveBlockAndStatus(block, BlockStatus.ADDED)) {
-                    return Receipt.failedReceipt(ReceiptCode.FAILED, "failed to save block to database");
-                }
-
-                // Add the block to layer one.
-                layerOneCode = this.callbacks.getLayerOneAddBlockCallback().add(block);
-                return (layerOneCode == 0) ? Receipt.successfulReceipt() : Receipt.layerOneFailedReceipt(layerOneCode);
+                // Add the block.
+                return addBlockPrivate(block);
             } catch (Exception e) {
                 return Receipt.unexpectedErrorReceipt(e);
             }
         }
+    }
+
+    /**
+     * Validates the block using both the layer zero and layer one validation logic.
+     */
+    private Receipt validateBlock(Block block) {
+        // Perform the layer zero block verifications.
+        Receipt receipt = BlockValidator.runLayerZeroValidation(block, this.database, this.hashFunction, this.signatureVerifier);
+        if (receipt.getCode() != ReceiptCode.SUCCESS) {
+            return receipt;
+        }
+
+        // Perform the layer one block verifications.
+        int layerOneCode = this.callbacks.getLayerOneValidateBlockCallback().validate(block);
+        if (layerOneCode != 0) {
+            return Receipt.layerOneFailedReceipt(layerOneCode);
+        }
+
+        return Receipt.successfulReceipt();
+    }
+
+    /**
+     * Adds the given block to layer one and layer zero.
+     */
+    private Receipt addBlockPrivate(Block block) {
+        // Add the block to layer zero.
+        if (!this.database.saveBlockAndStatus(block, BlockStatus.ADDED)) {
+            return Receipt.failedReceipt(ReceiptCode.FAILED, "failed to save block to database");
+        }
+
+        // Add the block to layer one.
+        int layerOneCode = this.callbacks.getLayerOneAddBlockCallback().add(block);
+        return (layerOneCode == 0) ? Receipt.successfulReceipt() : Receipt.layerOneFailedReceipt(layerOneCode);
     }
 
     //------------------------------------------------------------------------------------------------------------------

@@ -19,13 +19,16 @@ public final class DatabaseHelper {
      */
     public static ZeroDatabase newConsistentDatabase(Collection<Block> blocksInDb, Collection<Block> blocksToAdd) {
         ZeroDatabase database = Mockito.mock(ZeroDatabase.class);
+        // The database is always consistent.
+        Mockito.when(database.containsPendingBlocks()).thenReturn(false);
 
         // Add all blocks that are supposed to be in the database to it.
         boolean containsGenesis = false;
         for (Block block : blocksInDb) {
             Mockito.when(database.findBlockByHash(block.getBlockHash())).thenReturn(block);
             Mockito.when(database.blockExists(block.getBlockHash())).thenReturn(true);
-            Mockito.when(database.saveBlockAndStatus(block, BlockStatus.ADDED)).thenReturn(false);
+            Mockito.when(database.saveBlockAndStatus(block, BlockStatus.PENDING_ADDITION)).thenReturn(false);
+            Mockito.when(database.updateBlockStatus(block.getBlockHash(), BlockStatus.ADDED)).thenReturn(false);
 
             if (block.getBlockNumber().equals(BigInteger.ZERO)) {
                 containsGenesis = true;
@@ -37,7 +40,8 @@ public final class DatabaseHelper {
         for (Block block : blocksToAdd) {
             Mockito.when(database.findBlockByHash(block.getBlockHash())).thenReturn(null);
             Mockito.when(database.blockExists(block.getBlockHash())).thenReturn(false);
-            Mockito.when(database.saveBlockAndStatus(block, BlockStatus.ADDED)).thenReturn(true);
+            Mockito.when(database.saveBlockAndStatus(block, BlockStatus.PENDING_ADDITION)).thenReturn(true);
+            Mockito.when(database.updateBlockStatus(block.getBlockHash(), BlockStatus.ADDED)).thenReturn(true);
         }
 
         return database;

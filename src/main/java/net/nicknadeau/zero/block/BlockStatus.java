@@ -11,6 +11,11 @@ public enum BlockStatus {
      * The block has been fully added to the blockchain. This has been confirmed by both layer zero and layer one.
      */
     ADDED(0)
+
+    /*
+     * The block has not been fully added to the blockchain. The block has not been confirmed as added by layer one yet.
+     */
+    , PENDING_ADDITION(1)
     ;
 
     private final int value;

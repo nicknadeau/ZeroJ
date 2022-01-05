@@ -3,6 +3,7 @@ package net.nicknadeau.zero.blockchain;
 import net.nicknadeau.zero.block.Block;
 import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
+import net.nicknadeau.zero.exception.LayersOutOfSyncException;
 import net.nicknadeau.zero.storage.ZeroDatabase;
 import net.nicknadeau.zero.type.Receipt;
 import net.nicknadeau.zero.type.ReceiptCode;
@@ -14,6 +15,10 @@ import net.nicknadeau.zero.util.internal.BlockValidator;
 /**
  * The layer zero blockchain.
  *
+ * If the blockchain ever gets into an inconsistent state, which happens when layer zero and layer one get out of sync
+ * with one another, then all public methods (unless otherwise noted) will immediately throw
+ * {@link LayersOutOfSyncException}.
+ *
  * Instances of this class should be constructed using {@link ZeroBlockchain.Builder}.
  */
 public final class ZeroBlockchain {
@@ -22,6 +27,7 @@ public final class ZeroBlockchain {
     private final HashFunction hashFunction;
     private final SignatureVerifier signatureVerifier;
     private final ZeroCallbacks callbacks;
+    private boolean isOutOfSync;
 
     private ZeroBlockchain(ZeroDatabase database, HashFunction hashFunction, SignatureVerifier signatureVerifier, ZeroCallbacks callbacks) {
         ArgChecker.assertNonNull(database);
@@ -32,6 +38,7 @@ public final class ZeroBlockchain {
         this.hashFunction = hashFunction;
         this.signatureVerifier = signatureVerifier;
         this.callbacks = callbacks;
+        this.isOutOfSync = this.database.containsPendingBlocks();
     }
 
     /**
@@ -44,14 +51,22 @@ public final class ZeroBlockchain {
      * validation stage and the {@link net.nicknadeau.zero.blockchain.callback.LayerOneAddBlockCallback} callback to be
      * invoked once the block is actually added.
      *
+     * This operation is considered successful if and only if, both layer zero and layer one added the block to the
+     * blockchain. Note that if the block already exists in the blockchain, then re-adding it is a failure.
+     *
      * This is a thread-safe blocking method. Only a single thread is able to add a block at a time, so that internal
      * consistency can be maintained.
      *
      * @param block The block to add.
      * @return the receipt of the add operation.
+     * @throws LayersOutOfSyncException if adding this block caused the two layers to become out of sync.
      */
-    public Receipt addBlock(Block block) {
+    public Receipt addBlock(Block block) throws LayersOutOfSyncException {
         synchronized (this.lock) {
+            if (this.isOutOfSync) {
+                throw new LayersOutOfSyncException();
+            }
+
             try {
                 // Perform the block verifications.
                 Receipt receipt = validateBlock(block);
@@ -59,10 +74,17 @@ public final class ZeroBlockchain {
                     return receipt;
                 }
 
-                //TODO: Handle layer state mismatch recovery.
+                // Add the block to layer zero and mark it as pending.
+                if (!this.database.saveBlockAndStatus(block, BlockStatus.PENDING_ADDITION)) {
+                    return Receipt.failedReceipt(ReceiptCode.FAILED, "failed to save block to database");
+                }
 
-                // Add the block.
-                return addBlockPrivate(block);
+                // Add the block to layer one and finish adding it to layer zero.
+                return addPendingBlock(block);
+            } catch (LayersOutOfSyncException e) {
+                // In this case, we actually do want to allow the error to propagate.
+                this.isOutOfSync = true;
+                throw e;
             } catch (Exception e) {
                 return Receipt.unexpectedErrorReceipt(e);
             }
@@ -89,17 +111,23 @@ public final class ZeroBlockchain {
     }
 
     /**
-     * Adds the given block to layer one and layer zero.
+     * Adds the given block to layer one and then updates the status of the block to {@link BlockStatus#ADDED}.
+     *
+     * ASSUMPTION: The status of the block is already {@link BlockStatus#PENDING_ADDITION} on disk.
      */
-    private Receipt addBlockPrivate(Block block) {
-        // Add the block to layer zero.
-        if (!this.database.saveBlockAndStatus(block, BlockStatus.ADDED)) {
-            return Receipt.failedReceipt(ReceiptCode.FAILED, "failed to save block to database");
-        }
-
+    private Receipt addPendingBlock(Block block) throws LayersOutOfSyncException {
         // Add the block to layer one.
         int layerOneCode = this.callbacks.getLayerOneAddBlockCallback().add(block);
-        return (layerOneCode == 0) ? Receipt.successfulReceipt() : Receipt.layerOneFailedReceipt(layerOneCode);
+        if (layerOneCode != 0) {
+            return Receipt.layerOneFailedReceipt(layerOneCode);
+        }
+
+        // Finally, now we can update the status to being fully added to the blockchain.
+        if (!this.database.updateBlockStatus(block.getBlockHash(), BlockStatus.ADDED)) {
+            throw new LayersOutOfSyncException();
+        }
+
+        return Receipt.successfulReceipt();
     }
 
     //------------------------------------------------------------------------------------------------------------------

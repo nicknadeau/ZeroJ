@@ -27,7 +27,6 @@ public interface ZeroDatabase {
      * Returns {@code false} if {@code blockHash == null}.
      *
      * @return true if a block with the given hash exists and otherwise false.
-     * @throws NullPointerException if blockHash is null.
      */
     public boolean blockExists(byte[] blockHash);
 
@@ -51,4 +50,27 @@ public interface ZeroDatabase {
      * @throws NullPointerException if block or status are null.
      */
     public boolean saveBlockAndStatus(Block block, BlockStatus status);
+
+    /**
+     * Updates the block with the specified block hash in the database so that it has the specified block status, and
+     * returns {@code true} to indicate that the block status was successfully updated and {@code false} to indicate
+     * an error occurred and the block status could not be updated.
+     *
+     * If there is no such block in the database with the specified block hash then this method must return
+     * {@code false}.
+     *
+     * @param blockHash The block hash of the block to save the status for.
+     * @param status The new block status to save.
+     * @return whether or not the status was updated.
+     * @throws NullPointerException if blockHash or status are null.
+     */
+    public boolean updateBlockStatus(byte[] blockHash, BlockStatus status);
+
+    /**
+     * Returns {@code true} if and only if this database contains at least one block whose associated block status value
+     * is {@link BlockStatus#PENDING_ADDITION}. Returns {@code false} otherwise.
+     *
+     * @return whether or not this database contains any pending blocks.
+     */
+    public boolean containsPendingBlocks();
 }

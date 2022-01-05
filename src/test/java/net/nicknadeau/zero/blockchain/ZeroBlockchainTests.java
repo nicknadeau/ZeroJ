@@ -4,6 +4,7 @@ import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.LayerOneAddBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.LayerOneValidateBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
+import net.nicknadeau.zero.exception.LayersOutOfSyncException;
 import net.nicknadeau.zero.mock.BlockHelper;
 import net.nicknadeau.zero.mock.CallbackHelper;
 import net.nicknadeau.zero.mock.DatabaseHelper;
@@ -24,7 +25,7 @@ public class ZeroBlockchainTests {
     private static final SignatureVerifier ALWAYS_OK_VERIFIER = (key, payload, signature) -> true;
 
     @Test
-    public void testAddLayerZeroInvalidBlock() {
+    public void testAddLayerZeroInvalidBlock() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -45,7 +46,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testAddLayerOneInvalidBlock() {
+    public void testAddLayerOneInvalidBlock() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -67,12 +68,12 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testAddWhenSaveBlockCallFails() {
+    public void testAddWhenSaveBlockCallFails() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
         // Override the database to fail when we first try to save the block.
-        Mockito.when(database.saveBlockAndStatus(genesisBlock, BlockStatus.ADDED)).thenReturn(false);
+        Mockito.when(database.saveBlockAndStatus(genesisBlock, BlockStatus.PENDING_ADDITION)).thenReturn(false);
 
         ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
         ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
@@ -88,7 +89,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testAddWhenLayerOneAddBlockFails() {
+    public void testAddWhenLayerOneAddBlockFails() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -110,7 +111,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testAddWhenExceptionThrown() {
+    public void testAddWhenExceptionThrown() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -133,7 +134,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testAddBlockSucceeds() {
+    public void testAddBlockSucceeds() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -148,5 +149,44 @@ public class ZeroBlockchainTests {
         Receipt receipt = blockchain.addBlock(genesisBlock);
         Assert.assertNotNull(receipt);
         Assert.assertEquals(ReceiptCode.SUCCESS, receipt.getCode());
+    }
+
+    @Test(expected = LayersOutOfSyncException.class)
+    public void testAddBlockWhenUpdateStatusCallFails() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+
+        // Override the database to say it fails to update the status.
+        Mockito.when(database.updateBlockStatus(genesisBlock.getBlockHash(), BlockStatus.ADDED)).thenReturn(false);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        blockchain.addBlock(genesisBlock);
+    }
+
+    @Test(expected = LayersOutOfSyncException.class)
+    public void testBlockchainBackedByOutOfSyncDatabase() throws Exception {
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
+
+        // Override the database to say it contains a pending block.
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+
+        // We add a null block just to prove the point -- when out of sync we expect the error thrown immediately.
+        blockchain.addBlock(null);
     }
 }

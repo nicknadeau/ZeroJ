@@ -6,4 +6,5 @@ module ZeroJ {
     exports net.nicknadeau.zero.type;
     exports net.nicknadeau.zero.storage;
     exports net.nicknadeau.zero.util;
+    exports net.nicknadeau.zero.exception;
 }

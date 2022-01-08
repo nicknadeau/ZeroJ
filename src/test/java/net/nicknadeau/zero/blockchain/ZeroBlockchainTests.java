@@ -1,11 +1,13 @@
 package net.nicknadeau.zero.blockchain;
 
+import net.nicknadeau.zero.block.Block;
 import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.LayerOneAddBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.LayerOneDeleteBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.LayerOneValidateBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
 import net.nicknadeau.zero.exception.LayersOutOfSyncException;
+import net.nicknadeau.zero.exception.RuntimeAssertionError;
 import net.nicknadeau.zero.mock.BlockHelper;
 import net.nicknadeau.zero.mock.CallbackHelper;
 import net.nicknadeau.zero.mock.DatabaseHelper;
@@ -19,7 +21,10 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.math.BigInteger;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 public class ZeroBlockchainTests {
     private static final HashFunction MIRROR_HASH = (payload) -> payload;
@@ -323,5 +328,244 @@ public class ZeroBlockchainTests {
         Receipt receipt = blockchain.removeBlock(genesisBlock);
         Assert.assertNotNull(receipt);
         Assert.assertEquals(ReceiptCode.SUCCESS, receipt.getCode());
+    }
+
+    @Test
+    public void testRecoveryNoPendingBlocks() {
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.SUCCESS, receipt.getCode());
+    }
+
+    @Test
+    public void testRecoveryOfPendingAdditionBlock() {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.singleton(genesisBlock));
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.SUCCESS, receipt.getCode());
+        Assert.assertFalse(blockchain.isOutOfSync());
+    }
+
+    @Test
+    public void testRecoveryOfPendingAdditionWhenCallbackFails() {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.singleton(genesisBlock));
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        int errorCode = 1;
+        LayerOneAddBlockCallback addCallback = (block) -> errorCode;
+        ZeroCallbacks callbacks = CallbackHelper.newCallbacks(addCallback);
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.LAYER_ONE_FAILURE, receipt.getCode());
+        Assert.assertEquals(errorCode, receipt.getLayerOneErrorCode());
+        Assert.assertTrue(blockchain.isOutOfSync());
+    }
+
+    @Test
+    public void testRecoveryOfPendingDeletionBlock() {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.singleton(genesisBlock), Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.singleton(genesisBlock));
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.SUCCESS, receipt.getCode());
+        Assert.assertFalse(blockchain.isOutOfSync());
+    }
+
+    @Test
+    public void testRecoveryOfPendingDeletionWhenCallbackFails() {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.singleton(genesisBlock), Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.singleton(genesisBlock));
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        int errorCode = 1;
+        LayerOneDeleteBlockCallback deleteCallback = (block) -> errorCode;
+        ZeroCallbacks callbacks = CallbackHelper.newCallbacks(deleteCallback);
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.LAYER_ONE_FAILURE, receipt.getCode());
+        Assert.assertEquals(errorCode, receipt.getLayerOneErrorCode());
+        Assert.assertTrue(blockchain.isOutOfSync());
+    }
+
+    @Test(expected = RuntimeAssertionError.class)
+    public void testRecoveryOfMultiplePendingAdditionBlocks() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        MutableBlock block = BlockHelper.newNonGenesisBlock(BigInteger.ONE, genesisBlock, MIRROR_HASH);
+
+        Set<Block> blocksToAdd = new HashSet<>();
+        blocksToAdd.add(genesisBlock);
+        blocksToAdd.add(block);
+
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), blocksToAdd);
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(blocksToAdd);
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.UNEXPECTED, receipt.getCode());
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        throw receipt.getUnexpectedErrorCause();
+    }
+
+    @Test(expected = RuntimeAssertionError.class)
+    public void testRecoveryOfMultiplePendingDeletionBlocks() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        MutableBlock block = BlockHelper.newNonGenesisBlock(BigInteger.ONE, genesisBlock, MIRROR_HASH);
+
+        Set<Block> blocksToRemove = new HashSet<>();
+        blocksToRemove.add(genesisBlock);
+        blocksToRemove.add(block);
+
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(blocksToRemove, Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(blocksToRemove);
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.UNEXPECTED, receipt.getCode());
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        throw receipt.getUnexpectedErrorCause();
+    }
+
+    @Test(expected = RuntimeAssertionError.class)
+    public void testRecoveryWhenOutOfSyncWithNoPendingBlocks() throws Exception {
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.UNEXPECTED, receipt.getCode());
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        throw receipt.getUnexpectedErrorCause();
+    }
+
+    @Test
+    public void testRecoveryWhenExceptionThrown() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.singleton(genesisBlock));
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        RuntimeException error = new RuntimeException();
+        LayerOneAddBlockCallback addCallback = (block) -> { throw error; };
+        ZeroCallbacks callbacks = CallbackHelper.newCallbacks(addCallback);
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Assert.assertTrue(blockchain.isOutOfSync());
+
+        Receipt receipt = blockchain.recover();
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.UNEXPECTED, receipt.getCode());
+        Assert.assertEquals(error, receipt.getUnexpectedErrorCause());
+        Assert.assertTrue(blockchain.isOutOfSync());
     }
 }

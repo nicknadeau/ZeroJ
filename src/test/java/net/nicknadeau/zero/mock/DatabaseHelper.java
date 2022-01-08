@@ -7,6 +7,7 @@ import org.mockito.Mockito;
 
 import java.math.BigInteger;
 import java.util.Collection;
+import java.util.Collections;
 
 /**
  * Helper class that constructs instances of {@link ZeroDatabase} for tests.
@@ -21,6 +22,9 @@ public final class DatabaseHelper {
         ZeroDatabase database = Mockito.mock(ZeroDatabase.class);
         // The database is always consistent.
         Mockito.when(database.containsPendingBlocks()).thenReturn(false);
+        Mockito.when(database.findBlocksByStatus(BlockStatus.ADDED)).thenReturn(blocksInDb);
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_ADDITION)).thenReturn(Collections.emptySet());
+        Mockito.when(database.findBlocksByStatus(BlockStatus.PENDING_DELETION)).thenReturn(Collections.emptySet());
 
         // Add all blocks that are supposed to be in the database to it.
         boolean containsGenesis = false;

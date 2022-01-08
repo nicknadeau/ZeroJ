@@ -4,6 +4,7 @@ import net.nicknadeau.zero.block.Block;
 import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
 import net.nicknadeau.zero.exception.LayersOutOfSyncException;
+import net.nicknadeau.zero.exception.RuntimeAssertionError;
 import net.nicknadeau.zero.storage.ZeroDatabase;
 import net.nicknadeau.zero.type.Receipt;
 import net.nicknadeau.zero.type.ReceiptCode;
@@ -11,6 +12,8 @@ import net.nicknadeau.zero.util.HashFunction;
 import net.nicknadeau.zero.util.SignatureVerifier;
 import net.nicknadeau.zero.util.internal.ArgChecker;
 import net.nicknadeau.zero.util.internal.BlockValidator;
+
+import java.util.Collection;
 
 /**
  * The layer zero blockchain.
@@ -39,6 +42,81 @@ public final class ZeroBlockchain {
         this.signatureVerifier = signatureVerifier;
         this.callbacks = callbacks;
         this.isOutOfSync = this.database.containsPendingBlocks();
+    }
+
+    /**
+     * Returns {@code true} if and only if this blockchain is out of sync and {@code false} otherwise.
+     *
+     * If the blockchain is out of sync then all public methods will throw {@link LayersOutOfSyncException} when invoked
+     * unless otherwise noted. This method, of course, is an exception to that rule. In the case that the blockchain is
+     * out of sync, a recovery can be attempted via {@link ZeroBlockchain#recover()}.
+     *
+     * @return whether or not the blockchain is out of sync.
+     */
+    public boolean isOutOfSync() {
+        synchronized (this.lock) {
+            return this.isOutOfSync;
+        }
+    }
+
+    /**
+     * Attempts to run the recovery mechanisms on this blockchain in order to ensure the blockchain is consistent. If
+     * the blockchain is already consistent then this method will do nothing. Otherwise, if it is in an inconsistent
+     * state then this method will attempt to repair the state of the blockchain to put it back into a consistent state.
+     *
+     * If the blockchain is inconsistent and therefore all public methods are throwing {@link LayersOutOfSyncException},
+     * this method will never throw such an exception and can always be invoked at any time, regardless of the state of
+     * the blockchain.
+     *
+     * Returns a successful receipt if the recovery process succeeded, in which case the blockchain is guaranteed to be
+     * consistent and any methods previously throwing {@link LayersOutOfSyncException} will no longer throw that error
+     * (unless invoking those methods causes a state change that returns us into an inconsistent state, of course).
+     *
+     * Returns an unsuccessful receipt if the recovery could not be performed successfully, in which case the blockchain
+     * is guaranteed to be in an inconsistent state and therefore will continue to throw {@link LayersOutOfSyncException}.
+     *
+     * This is a thread-safe blocking method. Only a single thread is able to enter ANY public method at a time, so that
+     * internal consistency can be maintained.
+     *
+     * @return the receipt of the recovery operation.
+     */
+    public Receipt recover() {
+        synchronized (this.lock) {
+            if (!this.isOutOfSync) {
+                return Receipt.successfulReceipt();
+            }
+
+            try {
+                Collection<Block> blocks = this.database.findBlocksByStatus(BlockStatus.PENDING_ADDITION);
+                if (blocks.size() > 1) {
+                    throw RuntimeAssertionError.unexpected();
+                } else if (blocks.size() == 1) {
+                    Receipt receipt = addPendingBlock(blocks.iterator().next());
+                    if (receipt.getCode() == ReceiptCode.SUCCESS) {
+                        this.isOutOfSync = false;
+                    }
+                    return receipt;
+                }
+
+                // If we are here, then there was no pending addition block to recover, so try a pending deletion.
+                blocks = this.database.findBlocksByStatus(BlockStatus.PENDING_DELETION);
+                if (blocks.size() > 1) {
+                    throw RuntimeAssertionError.unexpected();
+                } else if (blocks.size() == 1) {
+                    Receipt receipt = removePendingBlock(blocks.iterator().next());
+                    if (receipt.getCode() == ReceiptCode.SUCCESS) {
+                        this.isOutOfSync = false;
+                    }
+                    return receipt;
+                } else {
+                    // Then somehow we are both out of sync and yet have no pending blocks of any kind.
+                    // We should never be in this state.
+                    throw RuntimeAssertionError.unexpected();
+                }
+            } catch (Exception e) {
+                return Receipt.unexpectedErrorReceipt(e);
+            }
+        }
     }
 
     /**

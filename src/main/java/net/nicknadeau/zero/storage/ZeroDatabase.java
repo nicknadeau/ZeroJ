@@ -3,6 +3,8 @@ package net.nicknadeau.zero.storage;
 import net.nicknadeau.zero.block.Block;
 import net.nicknadeau.zero.block.BlockStatus;
 
+import java.util.Collection;
+
 /**
  * A database that layer zero calls into to determine its state.
  *
@@ -39,6 +41,17 @@ public interface ZeroDatabase {
      * @return the block or null if not found.
      */
     public Block findBlockByHash(byte[] blockHash);
+
+    /**
+     * Returns a collection of all the blocks in the database whose status is the specified status. Returns an empty
+     * collection is no blocks in the database have the specified status.
+     *
+     * Returns an empty collection is {@code status == null}.
+     *
+     * @param status The status to match against.
+     * @return the blocks with the status.
+     */
+    public Collection<Block> findBlocksByStatus(BlockStatus status);
 
     /**
      * Saves the specified block in the database and returns {@code true} to indicate that the block was successfully

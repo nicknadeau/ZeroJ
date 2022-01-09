@@ -2,6 +2,7 @@ package net.nicknadeau.zero.blockchain;
 
 import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.LayerOneAddBlockCallback;
+import net.nicknadeau.zero.blockchain.callback.LayerOneDeleteBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.LayerOneValidateBlockCallback;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
 import net.nicknadeau.zero.exception.LayersOutOfSyncException;
@@ -188,5 +189,139 @@ public class ZeroBlockchainTests {
 
         // We add a null block just to prove the point -- when out of sync we expect the error thrown immediately.
         blockchain.addBlock(null);
+    }
+
+    @Test
+    public void testRemoveBlockWhenUpdateStatusCallFails() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+
+        // Override the database to fail when we first try to update the block status.
+        Mockito.when(database.updateBlockStatus(genesisBlock.getBlockHash(), BlockStatus.PENDING_DELETION)).thenReturn(false);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Receipt receipt = blockchain.removeBlock(genesisBlock);
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.FAILED, receipt.getCode());
+    }
+
+    @Test
+    public void testRemoveWhenLayerOneDeleteBlockFails() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+
+        int errorCode = 1;
+        LayerOneDeleteBlockCallback deleteCallback = (block) -> { return errorCode; };
+        ZeroCallbacks callbacks = CallbackHelper.newCallbacks(deleteCallback);
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Receipt receipt = blockchain.removeBlock(genesisBlock);
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.LAYER_ONE_FAILURE, receipt.getCode());
+        Assert.assertEquals(errorCode, receipt.getLayerOneErrorCode());
+    }
+
+    @Test(expected = LayersOutOfSyncException.class)
+    public void testRemoveWhenRemoveDatabaseCallFails() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+
+        // Override the database to fail when we try to remove the block.
+        Mockito.when(database.removeBlockByHash(genesisBlock.getBlockHash())).thenReturn(false);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        blockchain.removeBlock(genesisBlock);
+    }
+
+    @Test
+    public void testRemoveWhenExceptionThrown() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+
+        IllegalArgumentException exception = new IllegalArgumentException();
+        LayerOneDeleteBlockCallback deleteCallback = (block) -> { throw exception; };
+        ZeroCallbacks callbacks = CallbackHelper.newCallbacks(deleteCallback);
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Receipt receipt = blockchain.removeBlock(genesisBlock);
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.UNEXPECTED, receipt.getCode());
+        Assert.assertEquals(exception, receipt.getUnexpectedErrorCause());
+    }
+
+    @Test(expected = LayersOutOfSyncException.class)
+    public void testRemoveBlockWhenOutOfSync() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+        Mockito.when(database.containsPendingBlocks()).thenReturn(true);
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        blockchain.removeBlock(genesisBlock);
+    }
+
+    @Test
+    public void testRemoveNullBlock() throws Exception {
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Receipt receipt = blockchain.removeBlock(null);
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.DOES_NOT_EXIST, receipt.getCode());
+    }
+
+    @Test
+    public void testRemoveBlockSucceeds() throws Exception {
+        MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
+        ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
+
+        ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
+        ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
+                .withDatabase(database)
+                .withHashFunction(MIRROR_HASH)
+                .withSignatureVerifier(ALWAYS_OK_VERIFIER)
+                .withCallbacks(callbacks)
+                .build()
+                ;
+        Receipt receipt = blockchain.removeBlock(genesisBlock);
+        Assert.assertNotNull(receipt);
+        Assert.assertEquals(ReceiptCode.SUCCESS, receipt.getCode());
     }
 }

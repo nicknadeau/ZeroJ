@@ -29,6 +29,8 @@ public final class DatabaseHelper {
             Mockito.when(database.blockExists(block.getBlockHash())).thenReturn(true);
             Mockito.when(database.saveBlockAndStatus(block, BlockStatus.PENDING_ADDITION)).thenReturn(false);
             Mockito.when(database.updateBlockStatus(block.getBlockHash(), BlockStatus.ADDED)).thenReturn(false);
+            Mockito.when(database.updateBlockStatus(block.getBlockHash(), BlockStatus.PENDING_DELETION)).thenReturn(true);
+            Mockito.when(database.removeBlockByHash(block.getBlockHash())).thenReturn(true);
 
             if (block.getBlockNumber().equals(BigInteger.ZERO)) {
                 containsGenesis = true;
@@ -42,6 +44,8 @@ public final class DatabaseHelper {
             Mockito.when(database.blockExists(block.getBlockHash())).thenReturn(false);
             Mockito.when(database.saveBlockAndStatus(block, BlockStatus.PENDING_ADDITION)).thenReturn(true);
             Mockito.when(database.updateBlockStatus(block.getBlockHash(), BlockStatus.ADDED)).thenReturn(true);
+            Mockito.when(database.updateBlockStatus(block.getBlockHash(), BlockStatus.PENDING_DELETION)).thenReturn(true);
+            Mockito.when(database.removeBlockByHash(block.getBlockHash())).thenReturn(true);
         }
 
         return database;

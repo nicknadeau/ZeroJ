@@ -16,6 +16,12 @@ public enum BlockStatus {
      * The block has not been fully added to the blockchain. The block has not been confirmed as added by layer one yet.
      */
     , PENDING_ADDITION(1)
+
+    /*
+     * The block has not been fully removed from the blockchain. The block has not been confirmed as removed by layer
+     * one yet.
+     */
+    , PENDING_DELETION(2)
     ;
 
     private final int value;

@@ -73,4 +73,14 @@ public interface ZeroDatabase {
      * @return whether or not this database contains any pending blocks.
      */
     public boolean containsPendingBlocks();
+
+    /**
+     * Returns {@code true} if and only if after returning from this method there is no such block in the database with
+     * the specified block hash. Thus, a call into this method with a block hash that does not exist should return
+     * {@code true}, including if {@code blockHash == null}. Returns {@code false} otherwise.
+     *
+     * @param blockHash The hash of the block to delete.
+     * @return whether or not the deletion was successful.
+     */
+    public boolean removeBlockByHash(byte[] blockHash);
 }

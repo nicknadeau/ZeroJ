@@ -42,6 +42,47 @@ public final class ZeroBlockchain {
     }
 
     /**
+     * Attempts to remove the specified block from this blockchain and returns a receipt descriptive of the outcome of
+     * this operation. As a result, calling into this method will cause the
+     * {@link net.nicknadeau.zero.blockchain.callback.LayerOneDeleteBlockCallback} callback to be invoked.
+     *
+     * This operation is considered successful if and only if, both layer zero and layer one removed the block from the
+     * blockchain.
+     *
+     * This is a thread-safe blocking method. Only a single thread is able to call ANY public method at a time, so that
+     * internal consistency can be maintained.
+     *
+     * @param block The block to delete.
+     * @return the receipt of the removal operation.
+     * @throws LayersOutOfSyncException if removing this block caused the two layers to become out of sync, or if the
+     * blockchain is already out of sync.
+     */
+    public Receipt removeBlock(Block block) throws LayersOutOfSyncException {
+        synchronized (this.lock) {
+            if (this.isOutOfSync) {
+                throw new LayersOutOfSyncException();
+            }
+            if (block == null) {
+                return Receipt.failedReceipt(ReceiptCode.DOES_NOT_EXIST, "block is null");
+            }
+
+            try {
+                if (!this.database.updateBlockStatus(block.getBlockHash(), BlockStatus.PENDING_DELETION)) {
+                    return Receipt.failedReceipt(ReceiptCode.FAILED, "failed to mark block for deletion");
+                }
+
+                return removePendingBlock(block);
+            } catch (LayersOutOfSyncException e) {
+                // In this case, we actually do want to allow the error to propagate.
+                this.isOutOfSync = true;
+                throw e;
+            } catch (Exception e) {
+                return Receipt.unexpectedErrorReceipt(e);
+            }
+        }
+    }
+
+    /**
      * Attempts to add the specified block to this blockchain and returns a receipt descriptive of the outcome of this
      * operation.
      *
@@ -54,12 +95,13 @@ public final class ZeroBlockchain {
      * This operation is considered successful if and only if, both layer zero and layer one added the block to the
      * blockchain. Note that if the block already exists in the blockchain, then re-adding it is a failure.
      *
-     * This is a thread-safe blocking method. Only a single thread is able to add a block at a time, so that internal
-     * consistency can be maintained.
+     * This is a thread-safe blocking method. Only a single thread is able to call ANY public method at a time, so that
+     * internal consistency can be maintained.
      *
      * @param block The block to add.
      * @return the receipt of the add operation.
-     * @throws LayersOutOfSyncException if adding this block caused the two layers to become out of sync.
+     * @throws LayersOutOfSyncException if adding this block caused the two layers to become out of sync, or if the
+     * blockchain is already out of sync.
      */
     public Receipt addBlock(Block block) throws LayersOutOfSyncException {
         synchronized (this.lock) {
@@ -124,6 +166,25 @@ public final class ZeroBlockchain {
 
         // Finally, now we can update the status to being fully added to the blockchain.
         if (!this.database.updateBlockStatus(block.getBlockHash(), BlockStatus.ADDED)) {
+            throw new LayersOutOfSyncException();
+        }
+
+        return Receipt.successfulReceipt();
+    }
+
+    /**
+     * Removes the given block from layer one and then removes it from layer zero.
+     *
+     * ASSUMPTION: The status of the block is already {@link BlockStatus#PENDING_DELETION} on disk.
+     */
+    private Receipt removePendingBlock(Block block) throws LayersOutOfSyncException {
+        int layerOneCode = this.callbacks.getLayerOneDeleteBlockCallback().delete(block);
+        if (layerOneCode != 0) {
+            return Receipt.layerOneFailedReceipt(layerOneCode);
+        }
+
+        // Finally, now we can remove the block.
+        if (!this.database.removeBlockByHash(block.getBlockHash())) {
             throw new LayersOutOfSyncException();
         }
 

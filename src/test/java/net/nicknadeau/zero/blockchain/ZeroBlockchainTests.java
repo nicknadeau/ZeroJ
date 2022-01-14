@@ -331,7 +331,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testRecoveryNoPendingBlocks() {
+    public void testRecoveryNoPendingBlocks() throws Exception {
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
         ZeroCallbacks callbacks = CallbackHelper.newSuccessfulCallbacks();
         ZeroBlockchain blockchain = ZeroBlockchain.Builder.newBuilder()
@@ -347,7 +347,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testRecoveryOfPendingAdditionBlock() {
+    public void testRecoveryOfPendingAdditionBlock() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
 
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
@@ -372,7 +372,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testRecoveryOfPendingAdditionWhenCallbackFails() {
+    public void testRecoveryOfPendingAdditionWhenCallbackFails() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
 
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.emptySet());
@@ -400,7 +400,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testRecoveryOfPendingDeletionBlock() {
+    public void testRecoveryOfPendingDeletionBlock() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
 
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.singleton(genesisBlock), Collections.emptySet());
@@ -425,7 +425,7 @@ public class ZeroBlockchainTests {
     }
 
     @Test
-    public void testRecoveryOfPendingDeletionWhenCallbackFails() {
+    public void testRecoveryOfPendingDeletionWhenCallbackFails() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
 
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.singleton(genesisBlock), Collections.emptySet());

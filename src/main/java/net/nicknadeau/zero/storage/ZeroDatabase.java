@@ -2,6 +2,7 @@ package net.nicknadeau.zero.storage;
 
 import net.nicknadeau.zero.block.Block;
 import net.nicknadeau.zero.block.BlockStatus;
+import net.nicknadeau.zero.exception.DatabaseError;
 
 import java.util.Collection;
 
@@ -20,7 +21,7 @@ public interface ZeroDatabase {
      *
      * @return true if a genesis block exists and otherwise false.
      */
-    public boolean genesisBlockExists();
+    public boolean genesisBlockExists() throws DatabaseError;
 
     /**
      * Returns {@code true} if and only if this database contains a block with the specified hash and {@code false}
@@ -30,7 +31,7 @@ public interface ZeroDatabase {
      *
      * @return true if a block with the given hash exists and otherwise false.
      */
-    public boolean blockExists(byte[] blockHash);
+    public boolean blockExists(byte[] blockHash) throws DatabaseError;
 
     /**
      * Returns the block in the database with the specified block hash or {@code null} if no such block exists.
@@ -40,7 +41,7 @@ public interface ZeroDatabase {
      * @param blockHash The block hash of the block to find.
      * @return the block or null if not found.
      */
-    public Block findBlockByHash(byte[] blockHash);
+    public Block findBlockByHash(byte[] blockHash) throws DatabaseError;
 
     /**
      * Returns a collection of all the blocks in the database whose status is the specified status. Returns an empty
@@ -51,7 +52,7 @@ public interface ZeroDatabase {
      * @param status The status to match against.
      * @return the blocks with the status.
      */
-    public Collection<Block> findBlocksByStatus(BlockStatus status);
+    public Collection<Block> findBlocksByStatus(BlockStatus status) throws DatabaseError;
 
     /**
      * Saves the specified block in the database and returns {@code true} to indicate that the block was successfully
@@ -62,7 +63,7 @@ public interface ZeroDatabase {
      * @return whether or not the block and its status were saved.
      * @throws NullPointerException if block or status are null.
      */
-    public boolean saveBlockAndStatus(Block block, BlockStatus status);
+    public boolean saveBlockAndStatus(Block block, BlockStatus status) throws DatabaseError;
 
     /**
      * Updates the block with the specified block hash in the database so that it has the specified block status, and
@@ -77,7 +78,7 @@ public interface ZeroDatabase {
      * @return whether or not the status was updated.
      * @throws NullPointerException if blockHash or status are null.
      */
-    public boolean updateBlockStatus(byte[] blockHash, BlockStatus status);
+    public boolean updateBlockStatus(byte[] blockHash, BlockStatus status) throws DatabaseError;
 
     /**
      * Returns {@code true} if and only if this database contains at least one block whose associated block status value
@@ -85,7 +86,7 @@ public interface ZeroDatabase {
      *
      * @return whether or not this database contains any pending blocks.
      */
-    public boolean containsPendingBlocks();
+    public boolean containsPendingBlocks() throws DatabaseError;
 
     /**
      * Returns {@code true} if and only if after returning from this method there is no such block in the database with
@@ -95,5 +96,5 @@ public interface ZeroDatabase {
      * @param blockHash The hash of the block to delete.
      * @return whether or not the deletion was successful.
      */
-    public boolean removeBlockByHash(byte[] blockHash);
+    public boolean removeBlockByHash(byte[] blockHash) throws DatabaseError;
 }

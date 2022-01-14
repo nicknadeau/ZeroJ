@@ -3,6 +3,7 @@ package net.nicknadeau.zero.blockchain;
 import net.nicknadeau.zero.block.Block;
 import net.nicknadeau.zero.block.BlockStatus;
 import net.nicknadeau.zero.blockchain.callback.ZeroCallbacks;
+import net.nicknadeau.zero.exception.DatabaseError;
 import net.nicknadeau.zero.exception.LayersOutOfSyncException;
 import net.nicknadeau.zero.exception.RuntimeAssertionError;
 import net.nicknadeau.zero.storage.ZeroDatabase;
@@ -32,7 +33,7 @@ public final class ZeroBlockchain {
     private final ZeroCallbacks callbacks;
     private boolean isOutOfSync;
 
-    private ZeroBlockchain(ZeroDatabase database, HashFunction hashFunction, SignatureVerifier signatureVerifier, ZeroCallbacks callbacks) {
+    private ZeroBlockchain(ZeroDatabase database, HashFunction hashFunction, SignatureVerifier signatureVerifier, ZeroCallbacks callbacks) throws DatabaseError {
         ArgChecker.assertNonNull(database);
         ArgChecker.assertNonNull(hashFunction);
         ArgChecker.assertNonNull(signatureVerifier);
@@ -235,7 +236,7 @@ public final class ZeroBlockchain {
      *
      * ASSUMPTION: The status of the block is already {@link BlockStatus#PENDING_ADDITION} on disk.
      */
-    private Receipt addPendingBlock(Block block) throws LayersOutOfSyncException {
+    private Receipt addPendingBlock(Block block) throws LayersOutOfSyncException, DatabaseError {
         // Add the block to layer one.
         int layerOneCode = this.callbacks.getLayerOneAddBlockCallback().add(block);
         if (layerOneCode != 0) {
@@ -255,7 +256,7 @@ public final class ZeroBlockchain {
      *
      * ASSUMPTION: The status of the block is already {@link BlockStatus#PENDING_DELETION} on disk.
      */
-    private Receipt removePendingBlock(Block block) throws LayersOutOfSyncException {
+    private Receipt removePendingBlock(Block block) throws LayersOutOfSyncException, DatabaseError {
         int layerOneCode = this.callbacks.getLayerOneDeleteBlockCallback().delete(block);
         if (layerOneCode != 0) {
             return Receipt.layerOneFailedReceipt(layerOneCode);
@@ -341,7 +342,7 @@ public final class ZeroBlockchain {
          *
          * @return the new instance.
          */
-        public ZeroBlockchain build() {
+        public ZeroBlockchain build() throws DatabaseError {
             return new ZeroBlockchain(this.database
                     , this.hashFunction
                     , this.signatureVerifier

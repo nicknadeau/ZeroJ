@@ -22,7 +22,7 @@ public class BlockValidatorTests {
     private static final SignatureVerifier ALWAYS_OK_VERIFIER = (key, payload, signature) -> true;
 
     @Test
-    public void testNullArgs() {
+    public void testNullArgs() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -54,7 +54,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testNullBlockAttributes() {
+    public void testNullBlockAttributes() throws Exception {
         BigInteger number = BigInteger.ONE;
         byte[] producerKey = new byte[32];
         byte[] parentHash = new byte[32];
@@ -111,7 +111,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testIncompatibleMajorVersion() {
+    public void testIncompatibleMajorVersion() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -123,7 +123,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testParentDoesNotExist() {
+    public void testParentDoesNotExist() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         MutableBlock block = BlockHelper.newNonGenesisBlock(BigInteger.ONE, genesisBlock, MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.singleton(genesisBlock), Collections.singleton(block));
@@ -138,7 +138,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testParentNumberNotOneLess() {
+    public void testParentNumberNotOneLess() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         MutableBlock block = BlockHelper.newNonGenesisBlock(BigInteger.ONE, genesisBlock, MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.singleton(genesisBlock), Collections.singleton(block));
@@ -151,7 +151,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testAddBlockThatAlreadyExists() {
+    public void testAddBlockThatAlreadyExists() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         MutableBlock block = BlockHelper.newNonGenesisBlock(BigInteger.ONE, genesisBlock, MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.singleton(genesisBlock), Collections.singleton(block));
@@ -167,7 +167,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testAddGenesisWhenOtherGenesisExists() {
+    public void testAddGenesisWhenOtherGenesisExists() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         MutableBlock otherGenesis = BlockHelper.newGenesisBlock(MIRROR_HASH);
         MutableBlock block = BlockHelper.newNonGenesisBlock(BigInteger.ONE, genesisBlock, MIRROR_HASH);
@@ -180,7 +180,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testIllegitimateHash() {
+    public void testIllegitimateHash() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -192,7 +192,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testIllegitimateSignature() {
+    public void testIllegitimateSignature() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -204,7 +204,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testUnexpectedErrorThrown() {
+    public void testUnexpectedErrorThrown() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 
@@ -217,7 +217,7 @@ public class BlockValidatorTests {
     }
 
     @Test
-    public void testAddValidBlock() {
+    public void testAddValidBlock() throws Exception {
         MutableBlock genesisBlock = BlockHelper.newGenesisBlock(MIRROR_HASH);
         ZeroDatabase database = DatabaseHelper.newConsistentDatabase(Collections.emptySet(), Collections.singleton(genesisBlock));
 

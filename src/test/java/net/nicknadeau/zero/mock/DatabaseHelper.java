@@ -2,6 +2,7 @@ package net.nicknadeau.zero.mock;
 
 import net.nicknadeau.zero.block.Block;
 import net.nicknadeau.zero.block.BlockStatus;
+import net.nicknadeau.zero.exception.DatabaseError;
 import net.nicknadeau.zero.storage.ZeroDatabase;
 import org.mockito.Mockito;
 
@@ -18,7 +19,7 @@ public final class DatabaseHelper {
      * Returns a new consistent mock database that contains all of the blocks in {@code blocksInDb} and which will not
      * contain (but will allow to be added) all of the blocks in {@code blocksToAdd}.
      */
-    public static ZeroDatabase newConsistentDatabase(Collection<Block> blocksInDb, Collection<Block> blocksToAdd) {
+    public static ZeroDatabase newConsistentDatabase(Collection<Block> blocksInDb, Collection<Block> blocksToAdd) throws DatabaseError {
         ZeroDatabase database = Mockito.mock(ZeroDatabase.class);
         // The database is always consistent.
         Mockito.when(database.containsPendingBlocks()).thenReturn(false);
